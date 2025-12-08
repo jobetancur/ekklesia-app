@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    /* Aquí aplicamos tus colores de fondo y texto base */
+    @apply bg-brand-bg-secondary text-brand-text antialiased;
+  }
+}
