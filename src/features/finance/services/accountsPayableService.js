@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 
 const BASE_FIELDS = 'id, title, amount, due_date, description, is_paid, paid_at, created_at';
 
-export async function listAccountsPayable({ siteId, includePaid = false }) {
+export async function listAccountsPayable({ siteId }) {
   if (!siteId) {
     return [];
   }
@@ -13,10 +13,7 @@ export async function listAccountsPayable({ siteId, includePaid = false }) {
     .eq('site_id', siteId)
     .order('due_date', { ascending: true });
 
-  if (!includePaid) {
-    query = query.eq('is_paid', false);
-  }
-
+  // Returning all items by default as requested
   const { data, error } = await query;
 
   if (error) {
@@ -31,6 +28,25 @@ export async function markAccountAsPaid(accountId) {
     .from('accounts_payable')
     .update({ is_paid: true, paid_at: new Date().toISOString() })
     .eq('id', accountId)
+    .select(BASE_FIELDS)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function createAccountPayable(payableData) {
+  const { data, error } = await supabase
+    .from('accounts_payable')
+    .insert([
+      {
+        ...payableData,
+        is_paid: false, // Default
+      },
+    ])
     .select(BASE_FIELDS)
     .single();
 

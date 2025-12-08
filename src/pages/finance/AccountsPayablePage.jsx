@@ -1,7 +1,10 @@
 import { useCallback, useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
+import { useParams } from 'react-router-dom';
+import { Plus } from 'lucide-react';
 import { useAccountsPayable } from '@/features/finance/hooks/useAccountsPayable';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import CreatePayableModal from '@/features/finance/components/CreatePayableModal';
 
 const currencyFormatter = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -47,9 +50,11 @@ function StatusBadge({ status }) {
 }
 
 export default function AccountsPayablePage() {
+  const { siteId: siteIdParam } = useParams();
   const { profile } = useAuth();
-  const siteId = profile?.site_id;
-  const [includePaid, setIncludePaid] = useState(false);
+  const siteId = siteIdParam ?? profile?.site_id;
+  const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'pending', 'paid'
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const {
     data: accounts = [],
@@ -59,7 +64,7 @@ export default function AccountsPayablePage() {
     refetch,
     markAsPaid,
     isMarkingPaid,
-  } = useAccountsPayable({ siteId, includePaid, enabled: Boolean(siteId) });
+  } = useAccountsPayable({ siteId, enabled: Boolean(siteId) });
 
   const totals = useMemo(() => {
     const pending = accounts.filter((account) => !account.is_paid);
@@ -73,9 +78,16 @@ export default function AccountsPayablePage() {
     };
   }, [accounts]);
 
-  const handleToggleIncludePaid = useCallback(() => {
-    setIncludePaid((prev) => !prev);
-  }, []);
+  const filteredAccounts = useMemo(() => {
+    switch (filterStatus) {
+      case 'pending':
+        return accounts.filter((a) => !a.is_paid);
+      case 'paid':
+        return accounts.filter((a) => a.is_paid);
+      default:
+        return accounts;
+    }
+  }, [accounts, filterStatus]);
 
   const handleMarkAsPaid = useCallback(
     async (accountId) => {
@@ -114,18 +126,19 @@ export default function AccountsPayablePage() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={handleToggleIncludePaid}
-            className="rounded-full border border-brand-border px-4 py-2 text-sm font-semibold text-brand-text-secondary hover:border-brand-text"
-          >
-            {includePaid ? 'Ocultar registradas' : 'Mostrar pagadas'}
-          </button>
-          <button
-            type="button"
             onClick={refetch}
             disabled={isFetching || isLoading}
             className="rounded-full bg-brand-orange px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-orange-dark disabled:opacity-60"
           >
             {isFetching ? 'Actualizando...' : 'Refrescar'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 rounded-full bg-gray-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-800"
+          >
+            <Plus size={16} />
+            Nueva Cuenta
           </button>
         </div>
       </header>
@@ -160,9 +173,37 @@ export default function AccountsPayablePage() {
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-        <div className="border-b border-gray-100 px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900">Detalle de cuentas</h2>
-          <p className="text-sm text-gray-500">Los colores representan la urgencia del pago.</p>
+        <div className="border-b border-gray-100 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Detalle de cuentas</h2>
+            <p className="text-sm text-gray-500">Los colores representan la urgencia del pago.</p>
+          </div>
+          <div className="flex bg-gray-100 p-1 rounded-lg">
+            <button
+              onClick={() => setFilterStatus('all')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                filterStatus === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Todas
+            </button>
+            <button
+              onClick={() => setFilterStatus('pending')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                filterStatus === 'pending' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Pendientes
+            </button>
+            <button
+              onClick={() => setFilterStatus('paid')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                filterStatus === 'paid' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Pagadas
+            </button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -182,7 +223,7 @@ export default function AccountsPayablePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 bg-white">
-                {accounts.map((account) => (
+                {filteredAccounts.map((account) => (
                   <tr key={account.id}>
                     <td className="px-6 py-3 text-sm font-medium text-gray-900">{account.title}</td>
                     <td className="px-6 py-3 text-right text-sm font-semibold text-gray-900">{formatCurrency(account.amount)}</td>
@@ -211,6 +252,12 @@ export default function AccountsPayablePage() {
           </div>
         )}
       </div>
+
+      <CreatePayableModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        siteId={siteId} 
+      />
     </section>
   );
 }

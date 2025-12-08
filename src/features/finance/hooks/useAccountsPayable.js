@@ -64,12 +64,12 @@ function computeSemaphoreStatus({ due_date: dueDateString, is_paid: isPaid }) {
   };
 }
 
-export function useAccountsPayable({ siteId, includePaid = false, enabled = true }) {
+export function useAccountsPayable({ siteId, enabled = true }) {
   const queryClient = useQueryClient();
 
   const accountsQuery = useQuery({
-    queryKey: ['accountsPayable', siteId, includePaid],
-    queryFn: () => listAccountsPayable({ siteId, includePaid }),
+    queryKey: ['accountsPayable', siteId],
+    queryFn: () => listAccountsPayable({ siteId }),
     enabled: Boolean(siteId) && enabled,
     staleTime: 1000 * 60 * 2,
     refetchOnWindowFocus: false,
@@ -89,7 +89,7 @@ export function useAccountsPayable({ siteId, includePaid = false, enabled = true
   const markAsPaid = useMutation({
     mutationFn: (accountId) => markAccountAsPaid(accountId),
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['accountsPayable', siteId, includePaid] }),
+      queryClient.invalidateQueries({ queryKey: ['accountsPayable', siteId] }),
   });
 
   return {

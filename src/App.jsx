@@ -1,9 +1,15 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import LoginPage from '@/pages/LoginPage';
 import AccountsPayablePage from '@/pages/finance/AccountsPayablePage';
+import FinanceDashboardPage from '@/pages/finance/FinanceDashboardPage';
+import TransactionsPage from '@/pages/finance/TransactionsPage';
+import FinanceSettingsPage from '@/pages/finance/FinanceSettingsPage';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import SiteFinanceLayout from '@/components/layout/SiteFinanceLayout';
 import ProtectedRoute from '@/components/layout/ProtectedRoute';
+import TithesPage from '@/pages/finance/TithesPage';
 
 // Placeholder para el Dashboard
 const DashboardHome = () => (
@@ -37,7 +43,17 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<DashboardLayout />}>
             <Route path="/" element={<DashboardHome />} />
-            <Route path="/finanzas" element={<AccountsPayablePage />} />
+            <Route path="/finanzas" element={<FinanceDashboardPage />} />
+            
+            {/* Rutas por Sede con Layout Propio */}
+            <Route path="/finanzas/sede/:siteId" element={<SiteFinanceLayout />}>
+              <Route index element={<Navigate to="cuentas-por-pagar" replace />} />
+              <Route path="cuentas-por-pagar" element={<AccountsPayablePage />} />
+              <Route path="movimientos" element={<TransactionsPage />} />
+              <Route path="diezmos/*" element={<TithesPage />} />
+              <Route path="configuracion" element={<FinanceSettingsPage />} />
+            </Route>
+
             <Route path="/miembros" element={<div>Módulo de Miembros (Próximamente)</div>} />
           </Route>
         </Route>
@@ -45,6 +61,7 @@ function App() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <Toaster position="top-right" richColors />
     </BrowserRouter>
   );
 }
