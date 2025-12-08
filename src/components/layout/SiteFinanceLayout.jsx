@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, NavLink, useParams, Link } from 'react-router-dom';
-import { ArrowLeft, LayoutDashboard, ArrowRightLeft, Settings } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, ArrowRightLeft, Settings, FileText } from 'lucide-react';
 import { useSites } from '@/features/sites/hooks/useSites';
 
 export default function SiteFinanceLayout() {
@@ -70,7 +70,7 @@ export default function SiteFinanceLayout() {
               }`
             }
           >
-            <ArrowRightLeft size={18} />
+            <FileText size={18} />
             <span>Informes de Diezmadores</span>
           </NavLink>
 
