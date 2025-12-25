@@ -66,7 +66,7 @@ export default function LoginPage() {
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              Correo institucional
+              Correo electrónico
             </label>
             <input
               id="email"

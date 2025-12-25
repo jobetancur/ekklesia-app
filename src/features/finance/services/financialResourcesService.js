@@ -119,3 +119,61 @@ export async function checkEntityUsage(entityType, id) {
   if (error) throw error;
   return count;
 }
+
+export async function getMinisterialSummary(organizationId, siteId = null, dateRange) {
+  let query = supabase
+    .from('transactions')
+    .select(`
+      amount,
+      type,
+      date,
+      site_id,
+      account_categories (name, type)
+    `)
+    .eq('organization_id', organizationId);
+
+  if (siteId) {
+    query = query.eq('site_id', siteId);
+  }
+
+  if (dateRange?.from) {
+    query = query.gte('date', dateRange.from.toISOString());
+  }
+  if (dateRange?.to) {
+    query = query.lte('date', dateRange.to.toISOString());
+  }
+
+  const { data, error } = await query;
+
+  if (error) throw error;
+
+  // Calculate totals and trends (placeholder logic for trends)
+  const income = data
+    .filter(t => t.type === 'INCOME')
+    .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+  
+  const expenses = data
+    .filter(t => t.type === 'EXPENSE')
+    .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+
+  // We also need site-specific data for the site list if needed, 
+  // but for the KPI cards this is enough.
+  // Actually, we need the balance from accounts for more accuracy on "Saldo Total"
+  
+  const { data: accounts, error: accountsError } = await supabase
+    .from('financial_accounts')
+    .select('balance')
+    .eq('organization_id', organizationId)
+    .match(siteId ? { site_id: siteId } : {});
+
+  if (accountsError) throw accountsError;
+
+  const totalBalance = accounts.reduce((sum, acc) => sum + (parseFloat(acc.balance) || 0), 0);
+
+  return {
+    income,
+    expenses,
+    balance: totalBalance,
+    transactions: data // Useful for breakdown if needed
+  };
+}

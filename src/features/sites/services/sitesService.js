@@ -1,10 +1,16 @@
 import { supabase } from '@/lib/supabase';
 
-export async function getSites() {
-  const { data, error } = await supabase
+export async function getSites(organizationId = null) {
+  let query = supabase
     .from('sites')
-    .select('id, name, city, address, organization_id') // Adjust fields based on DB schema, safely assuming name is there
+    .select('id, name, city, address, organization_id')
     .order('name');
+
+  if (organizationId) {
+    query = query.eq('organization_id', organizationId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw error;
