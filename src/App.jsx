@@ -13,27 +13,7 @@ import RoleProtected from '@/components/layout/RoleProtected';
 import { ROLES } from '@/types/roles';
 import TithesPage from '@/pages/finance/TithesPage';
 import SiteReportsPage from '@/pages/finance/SiteReportsPage';
-
-// Placeholder para el Dashboard
-const DashboardHome = () => (
-  <div>
-    <h2 className="text-2xl font-bold mb-4">Panel Principal</h2>
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <h3 className="text-gray-500 text-sm font-medium">Ingresos del Mes</h3>
-        <p className="text-2xl font-bold text-green-600 mt-2">$0.00</p>
-      </div>
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <h3 className="text-gray-500 text-sm font-medium">Gastos del Mes</h3>
-        <p className="text-2xl font-bold text-red-600 mt-2">$0.00</p>
-      </div>
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <h3 className="text-gray-500 text-sm font-medium">Miembros Activos</h3>
-        <p className="text-2xl font-bold text-blue-600 mt-2">0</p>
-      </div>
-    </div>
-  </div>
-);
+import NewsWall from '@/features/dashboard/components/NewsWall';
 
 function App() {
   return (
@@ -45,7 +25,7 @@ function App() {
         {/* Rutas Privadas */}
         <Route element={<ProtectedRoute />}>
           <Route element={<DashboardLayout />}>
-            <Route path="/" element={<DashboardHome />} />
+            <Route path="/" element={<NewsWall />} />
             
             {/* Rutas de Finanzas (Contable) */}
             <Route element={<RoleProtected allowedRoles={[ROLES.EKKLESIA_ADMIN, ROLES.SUPER_ADMIN, ROLES.SITE_ADMIN, ROLES.TREASURER]} />}>
