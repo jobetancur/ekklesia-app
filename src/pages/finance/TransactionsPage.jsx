@@ -39,7 +39,7 @@ function ResourceBadge({ name, colorClass = 'bg-gray-100 text-gray-800' }) {
 }
 
 export default function TransactionsPage() {
-  const { siteId } = useOutletContext();
+  const { siteId, organizationId } = useOutletContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -156,6 +156,7 @@ export default function TransactionsPage() {
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         siteId={siteId} 
+        organizationId={organizationId}
         initialData={editingTransaction}
       />
     </div>

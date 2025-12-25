@@ -1,32 +1,53 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Tag, Save, X, Loader2 } from 'lucide-react';
-import { useCategories, useFinancialResourceMutations } from '../hooks/useFinancialResources';
+import { Plus, Tag, Save, X, Loader2, Edit2, Trash2, AlertTriangle, Lock } from 'lucide-react';
+import { useCategories, useFinancialResourceMutations, checkEntityUsage } from '../hooks/useFinancialResources';
 
-export default function CategoriesManager({ siteId }) {
+export default function CategoriesManager({ siteId, organizationId }) {
   // Pass null to fetch ALL categories (system + local)
-  // TODO: Update useCategories to accept siteId filter if needed, 
-  // or handle filtering in UI if the API returns mixed.
-  // Assuming getCategories returns all for now.
-  const { data: allCategories, isLoading } = useCategories();
-  const { createCategory, isCreatingCategory } = useFinancialResourceMutations(siteId);
+  const { data: allCategories, isLoading } = useCategories(null, siteId);
+  const { 
+    createCategory, 
+    updateCategory,
+    deleteCategory,
+    isCreatingCategory,
+    isUpdatingCategory,
+    isDeletingCategory
+  } = useFinancialResourceMutations(siteId, organizationId);
 
   const [isCreating, setIsCreating] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState(null); // { id, name, type: 'warning' | 'blocked', count: 0 }
 
   // Filter categories by type for display
   // We can show two lists or one unified list with badges. Unified is simpler.
   // We should distinguish System Default vs Custom
   
-  const CreateForm = () => {
-    const { register, handleSubmit, reset } = useForm();
+  const CategoryForm = ({ defaultValues, onCancel, isEdit = false }) => {
+    const { register, handleSubmit, reset } = useForm({
+        defaultValues: defaultValues || {
+            type: 'INCOME',
+            name: ''
+        }
+    });
 
     const onSubmit = async (data) => {
       try {
-        await createCategory(data);
-        setIsCreating(false);
-        reset();
+        if (!siteId || !organizationId) {
+            alert("Error: Faltan datos de la sede u organización. Por favor espera a que cargue o recarga la página.");
+            return;
+        }
+        if (isEdit) {
+            await updateCategory({ id: defaultValues.id, ...data });
+            setEditingId(null);
+        } else {
+            await createCategory(data);
+            setIsCreating(false);
+            reset();
+        }
       } catch (error) {
-        console.error('Failed to create category', error);
+        console.error('Failed to save category', error);
+        alert('Error al guardar: ' + error.message);
       }
     };
 
@@ -49,15 +70,15 @@ export default function CategoriesManager({ siteId }) {
           <div className="flex gap-2 min-w-fit">
             <button
               type="submit"
-              disabled={isCreatingCategory}
+              disabled={isCreatingCategory || isUpdatingCategory}
               className="bg-slate-800 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-slate-900 flex items-center justify-center whitespace-nowrap"
             >
-              {isCreatingCategory ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+              {isCreatingCategory || isUpdatingCategory ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
               <span className="ml-2">Guardar</span>
             </button>
              <button
               type="button"
-              onClick={() => setIsCreating(false)}
+              onClick={onCancel}
               className="px-3 py-2 border border-gray-300 rounded-md text-gray-600 hover:bg-gray-100 flex items-center justify-center"
             >
               <X size={16} />
@@ -66,6 +87,40 @@ export default function CategoriesManager({ siteId }) {
         </div>
       </form>
     );
+  };
+
+  const handleDeleteClick = async (category) => {
+    try {
+        const count = await checkEntityUsage('category', category.id);
+        if (count > 0) {
+            setDeleteConfirmation({
+                id: category.id,
+                name: category.name,
+                type: 'blocked',
+                count
+            });
+        } else {
+            setDeleteConfirmation({
+                id: category.id,
+                name: category.name,
+                type: 'warning',
+                count: 0
+            });
+        }
+    } catch (error) {
+        console.error("Error checking usage", error);
+    }
+  };
+
+  const confirmDelete = async () => {
+      if (deleteConfirmation?.id) {
+          try {
+              await deleteCategory(deleteConfirmation.id);
+              setDeleteConfirmation(null);
+          } catch (e) {
+              console.error("Error deleting", e);
+          }
+      }
   };
 
   return (
@@ -84,7 +139,47 @@ export default function CategoriesManager({ siteId }) {
         </button>
       </div>
 
-      {isCreating && <CreateForm />}
+      {isCreating && <CategoryForm onCancel={() => setIsCreating(false)} />}
+
+       {/* Delete Confirmation Modal/Alert */}
+       {deleteConfirmation && (
+          <div className="bg-red-50 border border-red-100 rounded-lg p-4 mb-4 animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-start gap-3">
+                  <div className={`p-2 rounded-full ${deleteConfirmation.type === 'blocked' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'}`}>
+                      <AlertTriangle size={20} />
+                  </div>
+                  <div className="flex-1">
+                      <h4 className={`text-sm font-bold ${deleteConfirmation.type === 'blocked' ? 'text-red-800' : 'text-yellow-800'}`}>
+                          {deleteConfirmation.type === 'blocked' ? 'No se puede eliminar la categoría' : '¿Eliminar categoría?'}
+                      </h4>
+                      <p className="text-sm text-gray-600 mt-1">
+                          {deleteConfirmation.type === 'blocked' 
+                            ? `La categoría "${deleteConfirmation.name}" tiene ${deleteConfirmation.count} movimientos asociados. No se puede eliminar.`
+                            : `¿Estás seguro de eliminar "${deleteConfirmation.name}"? Esta acción no se puede deshacer.`
+                          }
+                      </p>
+                      <div className="mt-3 flex gap-2">
+                          {deleteConfirmation.type === 'warning' && (
+                              <button 
+                                onClick={confirmDelete}
+                                disabled={isDeletingCategory}
+                                className="px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded hover:bg-red-700 flex items-center gap-2"
+                              >
+                                {isDeletingCategory && <Loader2 className="animate-spin" size={12} />}
+                                Confirmar Eliminación
+                              </button>
+                          )}
+                          <button 
+                            onClick={() => setDeleteConfirmation(null)}
+                            className="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-xs font-semibold rounded hover:bg-gray-50"
+                          >
+                            Cancelar
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
 
       {isLoading ? (
          <div className="text-center py-8 text-gray-400"><Loader2 className="animate-spin mx-auto mb-2" />Cargando categorías...</div>
@@ -92,21 +187,51 @@ export default function CategoriesManager({ siteId }) {
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
              <div className="max-h-[500px] overflow-y-auto divide-y divide-gray-100">
                 {allCategories?.map(category => (
-                    <div key={category.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors group">
-                        <div className="flex-1">
-                            <p className="font-medium text-gray-900">{category.name}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                                <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${category.type === 'INCOME' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                    {category.type === 'INCOME' ? 'Ingreso' : 'Egreso'}
-                                </span>
-                                {category.is_system_default && (
-                                    <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200">
-                                        Sistema
-                                    </span>
-                                )}
-                            </div>
+                    editingId === category.id ? (
+                        <div key={category.id} className="p-2">
+                            <CategoryForm 
+                                defaultValues={category} 
+                                isEdit={true} 
+                                onCancel={() => setEditingId(null)} 
+                            />
                         </div>
-                    </div>
+                    ) : (
+                        <div key={category.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors group">
+                            <div className="flex-1">
+                                <p className="font-medium text-gray-900">{category.name}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${category.type === 'INCOME' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                        {category.type === 'INCOME' ? 'Ingreso' : 'Egreso'}
+                                    </span>
+                                    {category.is_system_default && (
+                                        <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200 flex items-center gap-1">
+                                            <Lock size={8} /> Sistema
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            {/* Actions */}
+                            {!category.is_system_default && (
+                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button 
+                                        onClick={() => setEditingId(category.id)}
+                                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                                        title="Editar"
+                                    >
+                                        <Edit2 size={16} />
+                                    </button>
+                                    <button 
+                                        onClick={() => handleDeleteClick(category)}
+                                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                        title="Eliminar"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )
                 ))}
             </div>
         </div>

@@ -1,26 +1,46 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Wallet, Edit2, Loader2, Save, X } from 'lucide-react';
-import { useFinancialAccounts, useFinancialResourceMutations } from '../hooks/useFinancialResources';
+import { Plus, Wallet, Edit2, Loader2, Save, X, Trash2, AlertTriangle } from 'lucide-react';
+import { useFinancialAccounts, useFinancialResourceMutations, checkEntityUsage } from '../hooks/useFinancialResources';
 
-export default function FinancialAccountsManager({ siteId }) {
+export default function FinancialAccountsManager({ siteId, organizationId }) {
   const { data: accounts, isLoading } = useFinancialAccounts(siteId);
-  const { createAccount, updateAccount, isCreatingAccount, isUpdatingAccount } = useFinancialResourceMutations(siteId);
+  const { 
+    createAccount, 
+    updateAccount, 
+    deleteAccount,
+    isCreatingAccount, 
+    isUpdatingAccount,
+    isDeletingAccount 
+  } = useFinancialResourceMutations(siteId, organizationId);
   
   const [editingId, setEditingId] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState(null); // { id, name, type: 'warning' | 'blocked', count: 0 }
 
-  // Form for creating new account
-  const CreateForm = () => {
-    const { register, handleSubmit, reset } = useForm();
+  // Form for creating/editing account
+  const  AccountForm = ({ defaultValues, onCancel, isEdit = false }) => {
+    const { register, handleSubmit, reset } = useForm({
+        defaultValues
+    });
 
     const onSubmit = async (data) => {
       try {
-        await createAccount(data);
-        setIsCreating(false);
-        reset();
+        if (!siteId || !organizationId) {
+            alert("Error: Faltan datos de la sede u organización. Por favor espera a que cargue o recarga la página.");
+            return;
+        }
+        if (isEdit) {
+            await updateAccount({ id: defaultValues.id, ...data });
+            setEditingId(null);
+        } else {
+            await createAccount(data);
+            setIsCreating(false);
+            reset();
+        }
       } catch (error) {
-        console.error('Failed to create account', error);
+        console.error('Failed to save account', error);
+        alert('Error al guardar: ' + error.message);
       }
     };
 
@@ -43,15 +63,15 @@ export default function FinancialAccountsManager({ siteId }) {
           <div className="flex gap-2 min-w-fit">
              <button
               type="submit"
-              disabled={isCreatingAccount}
+              disabled={isCreatingAccount || isUpdatingAccount}
               className="bg-slate-800 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-slate-900 flex items-center justify-center whitespace-nowrap"
             >
-              {isCreatingAccount ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+              {isCreatingAccount || isUpdatingAccount ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
               <span className="ml-2">Guardar</span>
             </button>
              <button
               type="button"
-              onClick={() => setIsCreating(false)}
+              onClick={onCancel}
               className="px-3 py-2 border border-gray-300 rounded-md text-gray-600 hover:bg-gray-100 flex items-center justify-center"
             >
               <X size={16} />
@@ -60,6 +80,40 @@ export default function FinancialAccountsManager({ siteId }) {
         </div>
       </form>
     );
+  };
+
+  const handleDeleteClick = async (account) => {
+    try {
+        const count = await checkEntityUsage('account', account.id);
+        if (count > 0) {
+            setDeleteConfirmation({
+                id: account.id,
+                name: account.name,
+                type: 'blocked',
+                count
+            });
+        } else {
+            setDeleteConfirmation({
+                id: account.id,
+                name: account.name,
+                type: 'warning',
+                count: 0
+            });
+        }
+    } catch (error) {
+        console.error("Error checking usage", error);
+    }
+  };
+
+  const confirmDelete = async () => {
+      if (deleteConfirmation?.id) {
+          try {
+              await deleteAccount(deleteConfirmation.id);
+              setDeleteConfirmation(null);
+          } catch (e) {
+              console.error("Error deleting", e);
+          }
+      }
   };
 
   return (
@@ -78,7 +132,47 @@ export default function FinancialAccountsManager({ siteId }) {
         </button>
       </div>
 
-      {isCreating && <CreateForm />}
+      {isCreating && <AccountForm onCancel={() => setIsCreating(false)} />}
+      
+      {/* Delete Confirmation Modal/Alert */}
+      {deleteConfirmation && (
+          <div className="bg-red-50 border border-red-100 rounded-lg p-4 mb-4 animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-start gap-3">
+                  <div className={`p-2 rounded-full ${deleteConfirmation.type === 'blocked' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'}`}>
+                      <AlertTriangle size={20} />
+                  </div>
+                  <div className="flex-1">
+                      <h4 className={`text-sm font-bold ${deleteConfirmation.type === 'blocked' ? 'text-red-800' : 'text-yellow-800'}`}>
+                          {deleteConfirmation.type === 'blocked' ? 'No se puede eliminar la cuenta' : '¿Eliminar cuenta?'}
+                      </h4>
+                      <p className="text-sm text-gray-600 mt-1">
+                          {deleteConfirmation.type === 'blocked' 
+                            ? `La cuenta "${deleteConfirmation.name}" tiene ${deleteConfirmation.count} movimientos asociados. No se puede eliminar.`
+                            : `¿Estás seguro de eliminar "${deleteConfirmation.name}"? Esta acción no se puede deshacer.`
+                          }
+                      </p>
+                      <div className="mt-3 flex gap-2">
+                          {deleteConfirmation.type === 'warning' && (
+                              <button 
+                                onClick={confirmDelete}
+                                disabled={isDeletingAccount}
+                                className="px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded hover:bg-red-700 flex items-center gap-2"
+                              >
+                                {isDeletingAccount && <Loader2 className="animate-spin" size={12} />}
+                                Confirmar Eliminación
+                              </button>
+                          )}
+                          <button 
+                            onClick={() => setDeleteConfirmation(null)}
+                            className="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-xs font-semibold rounded hover:bg-gray-50"
+                          >
+                            Cancelar
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
 
       {isLoading ? (
         <div className="text-center py-8 text-gray-400"><Loader2 className="animate-spin mx-auto mb-2" />Cargando cuentas...</div>
@@ -91,16 +185,38 @@ export default function FinancialAccountsManager({ siteId }) {
                 </div>
             ) : (
                 accounts?.map(account => (
-                <div key={account.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                    <div>
-                    <p className="font-medium text-gray-900">{account.name}</p>
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">{account.type === 'CASH' ? 'Efectivo' : 'Banco'}</p>
+                  editingId === account.id ? (
+                      <div key={account.id} className="p-2">
+                          <AccountForm 
+                            defaultValues={account} 
+                            isEdit={true} 
+                            onCancel={() => setEditingId(null)} 
+                          />
+                      </div>
+                  ) : (
+                    <div key={account.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors group">
+                        <div>
+                        <p className="font-medium text-gray-900">{account.name}</p>
+                        <p className="text-xs text-gray-500 uppercase tracking-wide">{account.type === 'CASH' ? 'Efectivo' : 'Banco'}</p>
+                        </div>
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                                onClick={() => setEditingId(account.id)}
+                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                                title="Editar"
+                            >
+                                <Edit2 size={16} />
+                            </button>
+                            <button 
+                                onClick={() => handleDeleteClick(account)}
+                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                title="Eliminar"
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        </div>
                     </div>
-                    {/* Add edit button logic later if needed, for now just list */}
-                    <div className="text-sm font-mono text-gray-600">
-                        {/* Balance could be shown here if we want */}
-                    </div>
-                </div>
+                  )
                 ))
             )}
           </div>

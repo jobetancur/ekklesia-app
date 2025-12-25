@@ -10,6 +10,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import SiteFinanceLayout from '@/components/layout/SiteFinanceLayout';
 import ProtectedRoute from '@/components/layout/ProtectedRoute';
 import TithesPage from '@/pages/finance/TithesPage';
+import SiteReportsPage from '@/pages/finance/SiteReportsPage';
 
 // Placeholder para el Dashboard
 const DashboardHome = () => (
@@ -50,6 +51,7 @@ function App() {
               <Route index element={<Navigate to="cuentas-por-pagar" replace />} />
               <Route path="cuentas-por-pagar" element={<AccountsPayablePage />} />
               <Route path="movimientos" element={<TransactionsPage />} />
+              <Route path="informes" element={<SiteReportsPage />} />
               <Route path="diezmos/*" element={<TithesPage />} />
               <Route path="configuracion" element={<FinanceSettingsPage />} />
             </Route>

@@ -21,7 +21,7 @@ export default function BatchEditor() {
   const [selectedAccount, setSelectedAccount] = useState('');
   
   // Queries for Modal
-  const { data: accounts } = useFinancialAccounts();
+  const { data: accounts } = useFinancialAccounts(batchData?.site_id);
 
   if (isLoading) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin text-gray-400" /></div>;
   if (!batchData) return <div className="p-8 text-center">Informe no encontrado</div>;

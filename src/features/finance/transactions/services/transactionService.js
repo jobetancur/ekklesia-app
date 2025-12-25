@@ -28,17 +28,14 @@ export async function listTransactions({ siteId }) {
 export async function createTransaction(transactionData) {
   const { data, error } = await supabase
     .from('transactions')
-    .insert([
-      {
-        ...transactionData,
-        status: 'COMPLETED', // Default status
-        metadata: {},
-      },
-    ])
+    .insert([transactionData])
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('Supabase createTransaction error:', error);
+    throw error;
+  }
   return data;
 }
 
@@ -52,4 +49,14 @@ export async function updateTransaction(id, updates) {
 
   if (error) throw error;
   return data;
+}
+
+export async function deleteTransaction(id) {
+  const { error } = await supabase
+    .from('transactions')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+  return true;
 }

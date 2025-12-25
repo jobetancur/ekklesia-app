@@ -96,17 +96,26 @@ export const useContributors = (search, organizationId) => {
   });
 };
 
-export const useFinancialAccounts = () => {
+export const useFinancialAccounts = (siteId) => {
   return useQuery({
-    queryKey: ['financial-accounts'],
+    queryKey: ['financial-accounts', siteId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('financial_accounts')
-        .select('id, name, type'); 
+        .select('id, name, type')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (siteId) {
+        query = query.eq('site_id', siteId);
+      }
+      
+      const { data, error } = await query;
       
       if (error) throw error;
       return data;
-    }
+    },
+    enabled: !!siteId
   });
 }
 
@@ -247,9 +256,9 @@ export const useTitheMutations = () => {
     mutationFn: async ({ batch_id, target_account_id, category_id }) => {
       const { data, error } = await supabase
         .rpc('approve_tithe_batch', { 
-           batch_id, 
-           target_account_id,
-           category_id
+           p_batch_id: batch_id, 
+           p_target_account_id: target_account_id,
+           p_category_id: category_id
         });
 
       if (error) throw error;
@@ -258,6 +267,10 @@ export const useTitheMutations = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['tithe-batches'] });
       queryClient.invalidateQueries({ queryKey: ['tithe-batch', variables.batch_id] });
+      // Invalidate transactions and accounts to refresh the UI elsewhere
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['financialAccounts'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-accounts'] });
     },
   });
 

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { listTransactions, createTransaction, updateTransaction } from '../services/transactionService';
+import { listTransactions, createTransaction, updateTransaction, deleteTransaction } from '../services/transactionService';
 
 export function useTransactions({ siteId, enabled = true }) {
   const queryClient = useQueryClient();
@@ -28,11 +28,21 @@ export function useTransactions({ siteId, enabled = true }) {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id) => deleteTransaction(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions', siteId] });
+      queryClient.invalidateQueries({ queryKey: ['financialAccounts', siteId] });
+    },
+  });
+
   return {
     ...transactionsQuery,
     createTransaction: createMutation.mutateAsync,
     isCreating: createMutation.isPending,
     updateTransaction: updateMutation.mutateAsync,
     isUpdating: updateMutation.isPending,
+    deleteTransaction: deleteMutation.mutateAsync,
+    isDeleting: deleteMutation.isPending,
   };
 }

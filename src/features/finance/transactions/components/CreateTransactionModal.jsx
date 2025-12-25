@@ -1,13 +1,16 @@
 import React, { useEffect } from 'react';
+import { toast } from 'sonner';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { X, Loader2, Calendar } from 'lucide-react';
 import { transactionSchema } from '../schemas/transactionSchema';
 import { useTransactions } from '../hooks/useTransactions';
 import { useFinancialAccounts, useCategories } from '../../hooks/useFinancialResources';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 
-export default function CreateTransactionModal({ isOpen, onClose, siteId, initialData = null }) {
+export default function CreateTransactionModal({ isOpen, onClose, siteId, organizationId, initialData = null }) {
   const isEditing = Boolean(initialData);
+  const { profile } = useAuth();
 
   const { register, handleSubmit, reset, control, setValue, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(transactionSchema),
@@ -27,7 +30,7 @@ export default function CreateTransactionModal({ isOpen, onClose, siteId, initia
 
   // Load resources
   const { data: accounts, isLoading: isLoadingAccounts } = useFinancialAccounts(siteId);
-  const { data: allCategories, isLoading: isLoadingCategories } = useCategories();
+  const { data: allCategories, isLoading: isLoadingCategories } = useCategories(null, siteId);
 
   // Filter categories based on selected type
   const categories = allCategories?.filter(c => c.type === type) || [];
@@ -63,15 +66,43 @@ export default function CreateTransactionModal({ isOpen, onClose, siteId, initia
 
   const onSubmit = async (data) => {
     try {
+      // Validation: Check funds for expenses
+      if (data.type === 'EXPENSE') {
+        const selectedAccount = accounts?.find(a => a.id === data.account_id);
+        const amount = parseFloat(data.amount);
+        const currentBalance = selectedAccount?.balance || 0;
+
+        if (amount > currentBalance) {
+          toast.error('Saldo insuficiente', {
+            description: `La cuenta "${selectedAccount?.name}" solo tiene ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(currentBalance)}. No es posible realizar este egreso.`,
+            duration: 5000,
+          });
+          return; // Stop submission
+        }
+      }
+
       if (isEditing) {
-        await updateTransaction({ id: initialData.id, ...data });
+        await updateTransaction({ 
+          id: initialData.id, 
+          ...data,
+          updated_by: profile?.id 
+        });
       } else {
-        await createTransaction({ ...data, site_id: siteId });
+        await createTransaction({ 
+          ...data, 
+          site_id: siteId, 
+          organization_id: organizationId,
+          created_by: profile?.id 
+        });
       }
       reset();
       onClose();
     } catch (error) {
       console.error('Error saving transaction:', error);
+      // Log detailed error for debugging
+      if (error.message) console.error('Error message:', error.message);
+      if (error.details) console.error('Error details:', error.details);
+      if (error.hint) console.error('Error hint:', error.hint);
     }
   };
 

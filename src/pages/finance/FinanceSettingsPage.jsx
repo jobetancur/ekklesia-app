@@ -4,7 +4,7 @@ import FinancialAccountsManager from '@/features/finance/components/FinancialAcc
 import CategoriesManager from '@/features/finance/components/CategoriesManager';
 
 export default function FinanceSettingsPage() {
-  const { siteId } = useOutletContext();
+  const { siteId, organizationId } = useOutletContext();
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-8">
@@ -15,10 +15,10 @@ export default function FinanceSettingsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div>
-           <FinancialAccountsManager siteId={siteId} />
+           <FinancialAccountsManager siteId={siteId} organizationId={organizationId} />
         </div>
         <div>
-           <CategoriesManager siteId={siteId} />
+           <CategoriesManager siteId={siteId} organizationId={organizationId} />
         </div>
       </div>
     </div>
