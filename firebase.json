@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "ekklesia-app-2025",
     "public": "dist",
     "ignore": [
       "firebase.json",
