@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useTitheBatch, useTitheMutations, useFinancialAccounts } from '../hooks/useTitheBatch';
+import { useTitheBatch, useTitheMutations, useFinancialAccounts, useIncomeCategories } from '../hooks/useTitheBatch';
 import EntryForm from './EntryForm';
-import { Loader2, ArrowLeft, Trash2, CheckCircle, Save, Calendar } from 'lucide-react';
+import { Loader2, ArrowLeft, Trash2, CheckCircle, Save, Calendar, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -11,17 +11,21 @@ export default function BatchEditor() {
   const { batchId } = useParams();
   const navigate = useNavigate();
   const { data: batchData, isLoading } = useTitheBatch(batchId);
-  const { deleteTitheEntry, updateBatch, approveBatch } = useTitheMutations();
+  const { deleteTitheEntry, updateBatch, approveBatch, deleteBatch } = useTitheMutations();
   const { mutate: doDelete, isPending: isDeleting } = deleteTitheEntry;
   const { mutate: doUpdate, isPending: isUpdating } = updateBatch;
   const { mutate: doApprove, isPending: isApproving } = approveBatch;
+  const { mutateAsync: doDeleteBatch, isPending: isDeletingBatch } = deleteBatch;
   
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+  const [isDeleteBatchModalOpen, setIsDeleteBatchModalOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [selectedAccount, setSelectedAccount] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
   
   // Queries for Modal
   const { data: accounts } = useFinancialAccounts(batchData?.site_id);
+  const { data: categories } = useIncomeCategories(batchData?.site_id);
 
   if (isLoading) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin text-gray-400" /></div>;
   if (!batchData) return <div className="p-8 text-center">Informe no encontrado</div>;
@@ -33,9 +37,25 @@ export default function BatchEditor() {
   };
 
   const handleUpdateName = (newName) => {
-      // Simple debounce or blur save could be better, just onBlur for now
       if (newName !== batchData.name) {
           doUpdate({ id: batchId, name: newName });
+      }
+  }
+
+  const handleUpdateDate = (newDate) => {
+      if (newDate && newDate !== batchData.batch_date) {
+          const updates = { id: batchId, batch_date: newDate };
+          
+          // If the name is the default "Informe DD/MM/YYYY", update it too
+          const currentPathDate = batchData.batch_date ? format(new Date(batchData.batch_date + 'T00:00:00'), 'dd/MM/yyyy') : '';
+          const defaultName = `Informe ${currentPathDate}`;
+          
+          if (batchData.name === defaultName) {
+              const newNameDate = format(new Date(newDate), 'dd/MM/yyyy');
+              updates.name = `Informe ${newNameDate}`;
+          }
+          
+          doUpdate(updates);
       }
   }
 
@@ -45,43 +65,32 @@ export default function BatchEditor() {
           return;
       }
       
-      // Need category_id. The user prompt mentioned it, but didn't say where to get it.
-      // Usually "Diezmos" is a specific category. 
-      // I'll make a select for category OR just pass null if backend handles it/defaults it.
-      // But the prompt said: approve_tithe_batch(batch_id, target_account_id, category_id)
-      // I will assume for now I need to fetch categories or pick a default. 
-      // I'll add a simple input for Category ID or just send a dummy if I can't query it.
-      // Let's assume the user selects it in the modal too, or we query categories?
-      // Since I don't have a category query handy in this file, I'll add a Category Select in that modal too, theoretically.
-      // But wait, "Categories" are usually complex. 
-      // I'll just hardcode a TODO or ask user? No, I must solve.
-      // I'll omit category_id for now or pass a placeholder if I can't find one. 
-      // Actually, standard is to let user pick category "Diezmos".
-      // I'll add a select for "category" if I can fetch them. 
-      // But I only implemented useFinancialAccounts.
-      // I'll check `useTitheBatch.js` again. I didn't add categories query.
-      // I will assume category_id is optional OR I should add a simple fetch for categories.
-      // Let's assume the logic is: Account is critical. Category might be fixed for "Tithes" Module.
-      // I'll pass a dummy '0000...' or let the user handle it via UI if I add categories.
-      // Re-reading request: "Al confirmar, debe ejecutar... approve_tithe_batch(batch_id, target_account_id, category_id)."
-      // I will assume I need to let them pick it. I'll add a basic input for ID or similar.
-      // Or better, I will fail if not provided, so I'll add a "Category ID" text input for now as I don't have the list.
-      
-      // WAIT! I don't want to break the flow.
-      // I'll assume standard Category ID for Tithes exists or I leave it null.
-      // I'll just pass null and see if DB handles it, OR better
-      // I will add a "Category ID" input to the modal, labeled "Categoría (ID)".
+      if (!selectedCategory) {
+          toast.error("Debe seleccionar una categoría de ingreso");
+          return;
+      }
       
       doApprove({ 
           batch_id: batchId, 
           target_account_id: selectedAccount,
-          category_id: null // Passing null, hoping DB has default or handles it.
+          category_id: selectedCategory
       }, {
           onSuccess: () => {
               setIsPostModalOpen(false);
               toast.success("Informe finalizado y contabilizado correctamente");
           }
       });
+  };
+
+  const handleDeleteBatch = async () => {
+      try {
+          await doDeleteBatch(batchId);
+          toast.success("Informe eliminado correctamente");
+          navigate('..');
+      } catch (error) {
+          console.error("Failed to delete batch", error);
+          toast.error("Error al eliminar el informe");
+      }
   };
 
   return (
@@ -103,9 +112,18 @@ export default function BatchEditor() {
                     <h2 className="text-2xl font-bold">{batchData.name}</h2>
                 )}
                 
-                <div className="flex items-center gap-2 text-sm text-gray-500 px-2">
+                <div className="flex items-center gap-2 text-sm text-gray-500 px-2 mt-1">
                     <Calendar className="h-4 w-4" />
-                    {batchData.batch_date ? format(new Date(batchData.batch_date), 'dd MMMM yyyy', { locale: es }) : '-'}
+                    {isDraft ? (
+                        <input 
+                            type="date"
+                            defaultValue={batchData.batch_date ? format(new Date(batchData.batch_date + 'T00:00:00'), 'yyyy-MM-dd') : ''}
+                            onChange={(e) => handleUpdateDate(e.target.value)}
+                            className="bg-transparent border-b border-dashed border-gray-300 focus:border-blue-500 focus:outline-none cursor-pointer"
+                        />
+                    ) : (
+                        <span>{batchData.batch_date ? format(new Date(batchData.batch_date + 'T00:00:00'), 'dd MMMM yyyy', { locale: es }) : '-'}</span>
+                    )}
                     <span className="mx-2">•</span>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${isDraft ? 'bg-gray-100' : 'bg-green-100 text-green-800'}`}>
                         {isDraft ? 'BORRADOR' : 'CONTABILIZADO'}
@@ -115,13 +133,23 @@ export default function BatchEditor() {
         </div>
         
         {isDraft && (
-            <button
-                onClick={() => setIsPostModalOpen(true)}
-                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center gap-2"
-            >
-                <CheckCircle className="h-4 w-4" />
-                Finalizar y Contabilizar
-            </button>
+            <div className="flex items-center gap-3">
+                <button
+                    onClick={() => setIsDeleteBatchModalOpen(true)}
+                    className="text-red-600 hover:bg-red-50 p-2 rounded-md transition-colors flex items-center gap-2"
+                    title="Eliminar informe completo"
+                >
+                    <Trash2 className="h-5 w-5" />
+                    <span className="text-sm font-medium">Eliminar</span>
+                </button>
+                <button
+                    onClick={() => setIsPostModalOpen(true)}
+                    className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center gap-2 shadow-sm transition-colors"
+                >
+                    <CheckCircle className="h-4 w-4" />
+                    Finalizar y Contabilizar
+                </button>
+            </div>
         )}
       </div>
 
@@ -224,12 +252,12 @@ export default function BatchEditor() {
                       Al finalizar, no podrás editar este informe. Selecciona la cuenta donde ingresará el dinero.
                   </p>
                   
-                  <div>
+                   <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                           Cuenta de Destino
                       </label>
                       <select 
-                        className="w-full border rounded-md px-3 py-2"
+                        className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-green-500 focus:outline-none"
                         value={selectedAccount}
                         onChange={(e) => setSelectedAccount(e.target.value)}
                       >
@@ -242,17 +270,35 @@ export default function BatchEditor() {
                       </select>
                   </div>
 
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Categoría Contable
+                      </label>
+                      <select 
+                        className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-green-500 focus:outline-none"
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                      >
+                          <option value="">Seleccionar categoría...</option>
+                          {categories?.map(cat => (
+                              <option key={cat.id} value={cat.id}>
+                                  {cat.name}
+                              </option>
+                          ))}
+                      </select>
+                  </div>
+
                   <div className="flex justify-end gap-3 pt-4">
                       <button 
                         onClick={() => setIsPostModalOpen(false)}
-                        className="px-4 py-2 hover:bg-gray-100 rounded text-gray-700"
+                        className="px-4 py-2 hover:bg-gray-100 rounded text-gray-700 font-medium"
                       >
                           Cancelar
                       </button>
                       <button 
                         onClick={handlePostBatch}
-                        disabled={!selectedAccount || isApproving}
-                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2"
+                        disabled={!selectedAccount || !selectedCategory || isApproving}
+                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2 shadow-sm disabled:opacity-50"
                       >
                         {isApproving && <Loader2 className="h-4 w-4 animate-spin" />}
                         Confirmar
@@ -294,6 +340,40 @@ export default function BatchEditor() {
                         className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center gap-2 font-medium"
                       >
                         Eliminar
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+      {/* Delete Batch Confirmation Modal */}
+      {isDeleteBatchModalOpen && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6 space-y-4">
+                  <div className="flex items-center gap-3 text-red-600">
+                      <div className="bg-red-100 p-2 rounded-full">
+                          <AlertCircle className="h-6 w-6" />
+                      </div>
+                      <h3 className="text-lg font-bold text-gray-900">¿Eliminar informe?</h3>
+                  </div>
+                  
+                  <p className="text-sm text-gray-600">
+                      Esta acción eliminará el informe completo y todos sus registros. Esta acción no se puede deshacer.
+                  </p>
+
+                  <div className="flex justify-end gap-3 pt-2">
+                      <button 
+                        onClick={() => setIsDeleteBatchModalOpen(false)}
+                        className="px-4 py-2 hover:bg-gray-100 rounded text-gray-700 font-medium"
+                      >
+                          Cancelar
+                      </button>
+                      <button 
+                        onClick={handleDeleteBatch}
+                        disabled={isDeletingBatch}
+                        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center gap-2 font-medium shadow-sm transition-colors"
+                      >
+                        {isDeletingBatch && <Loader2 className="h-4 w-4 animate-spin" />}
+                        Eliminar Informe
                       </button>
                   </div>
               </div>

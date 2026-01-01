@@ -143,6 +143,21 @@ export const useTitheMutations = () => {
     },
   });
 
+  const deleteBatch = useMutation({
+    mutationFn: async (batchId) => {
+      const { error } = await supabase
+        .from('tithe_batches')
+        .delete()
+        .eq('id', batchId);
+      
+      if (error) throw error;
+      return batchId;
+    },
+    onSuccess: (_, variables) => {
+       queryClient.invalidateQueries({ queryKey: ['tithe-batches'] });
+    },
+  });
+
   const updateBatch = useMutation({
     mutationFn: async ({ id, ...updates }) => {
       const { data, error } = await supabase
@@ -281,5 +296,24 @@ export const useTitheMutations = () => {
     deleteTitheEntry,
     createContributor,
     approveBatch,
+    deleteBatch,
   };
+};
+
+export const useIncomeCategories = (siteId) => {
+    return useQuery({
+        queryKey: ['income-categories', siteId],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('account_categories')
+                .select('*')
+                .eq('type', 'INCOME')
+                .or(`is_system_default.eq.true,site_id.eq.${siteId}`)
+                .order('name');
+            
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!siteId
+    });
 };

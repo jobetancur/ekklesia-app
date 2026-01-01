@@ -27,7 +27,7 @@ export default function BatchList() {
         site_id: siteId, 
         organization_id: profile.organization_id,
         created_by: profile.id,
-        batch_date: new Date().toISOString(),
+        batch_date: format(new Date(), 'yyyy-MM-dd'),
         status: 'DRAFT', 
         name: `Informe ${format(new Date(), 'dd/MM/yyyy')}`
       });
@@ -99,7 +99,7 @@ export default function BatchList() {
                 <td className="px-6 py-4 text-gray-500">
                     <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-gray-400" />
-                        {batch.batch_date ? format(new Date(batch.batch_date), 'dd MMM yyyy', { locale: es }) : '-'}
+                        {batch.batch_date ? format(new Date(batch.batch_date + 'T00:00:00'), 'dd MMM yyyy', { locale: es }) : '-'}
                     </div>
                 </td>
                 <td className="px-6 py-4">{getStatusBadge(batch.status)}</td>
