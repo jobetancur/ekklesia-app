@@ -1,0 +1,29 @@
+name: Despertador de Supabase (Keep Alive)
+
+on:
+  schedule:
+    # Se ejecuta a las 00:00 y 12:00 UTC (cada 12 horas)
+    - cron: '0 0,12 * * *'
+  workflow_dispatch: # Permite ejecutarlo manualmente
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: Despertar Supabase (Query a Profiles)
+        run: |
+          echo "Enviando ping a Supabase..."
+          
+          response=$(curl -s -o /dev/null -w "%{http_code}" --location --request GET "${{ secrets.VITE_SUPABASE_URL }}/rest/v1/profiles?select=id&limit=1" \
+            --header "apikey: ${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
+            --header "Authorization: Bearer ${{ secrets.VITE_SUPABASE_ANON_KEY }}")
+
+          echo "Status Code recibido: $response"
+
+          if [[ "$response" =~ ^(200|201|204|206|401)$ ]]; then
+            echo "✅ Éxito: Supabase ha recibido la petición (Código $response)."
+          else
+            echo "⚠️ Alerta: Supabase respondió con código inesperado $response."
+          fi
