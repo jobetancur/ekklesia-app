@@ -14,6 +14,7 @@ import { ROLES } from '@/types/roles';
 import TithesPage from '@/pages/finance/TithesPage';
 import SiteReportsPage from '@/pages/finance/SiteReportsPage';
 import NewsWall from '@/features/dashboard/components/NewsWall';
+import ProfilePage from '@/pages/ProfilePage';
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<DashboardLayout />}>
             <Route path="/" element={<NewsWall />} />
+            <Route path="/perfil" element={<ProfilePage />} />
             
             {/* Rutas de Finanzas (Contable) */}
             <Route element={<RoleProtected allowedRoles={[ROLES.EKKLESIA_ADMIN, ROLES.SUPER_ADMIN, ROLES.SITE_ADMIN, ROLES.TREASURER]} />}>

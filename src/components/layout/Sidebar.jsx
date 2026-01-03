@@ -138,14 +138,20 @@ export default function Sidebar() {
 
       {/* User Profile Footer */}
       <div className="p-4 border-t border-gray-100">
-        <div className={cn("flex items-center gap-3 mb-2", isCollapsed ? "justify-center" : "")}>
-          <div className="h-9 w-9 rounded-full bg-brand-orange/10 flex items-center justify-center text-brand-orange font-bold flex-shrink-0">
+        <NavLink 
+          to="/perfil"
+          className={cn(
+            "flex items-center gap-3 mb-2 p-2 -mx-2 rounded-lg hover:bg-gray-50 transition-colors group", 
+            isCollapsed ? "justify-center" : ""
+          )}
+        >
+          <div className="h-9 w-9 rounded-full bg-brand-orange/10 flex items-center justify-center text-brand-orange font-bold flex-shrink-0 group-hover:bg-brand-orange/20 transition-colors">
             {profile?.first_name?.[0] || 'U'}
           </div>
           
           {!isCollapsed && (
-            <div className="overflow-hidden min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
+            <div className="overflow-hidden min-w-0 text-left">
+              <p className="text-sm font-medium text-gray-900 truncate group-hover:text-brand-orange transition-colors">
                 {profile?.first_name || 'Usuario'}
               </p>
               <p className="text-xs text-gray-500 truncate">
@@ -153,7 +159,7 @@ export default function Sidebar() {
               </p>
             </div>
           )}
-        </div>
+        </NavLink>
         
         <button 
           onClick={handleLogout}
